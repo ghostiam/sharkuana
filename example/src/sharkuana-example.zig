@@ -28,15 +28,15 @@ pub fn proto_register() void {
 }
 
 pub fn plugin_describe() shark.PluginDesc {
-    return .Epan;
+    return .Dissector;
 }
 
-fn dissect_zig(tvb: ?*shark.tvbuff_t, pinfo: ?*shark.PacketInfo, tree: shark.ProtoTree, _: ?*anyopaque) callconv(.C) c_int {
-    const num = pinfo.?.*.num;
+fn dissect_zig(tvb: *shark.TvBuff, pinfo: *shark.PacketInfo, tree: *shark.ProtoTree, _: ?*anyopaque) callconv(.C) i32 {
+    const num = pinfo.num;
 
     log.info("num: {}", .{num});
 
-    _ = tree.AddProtocolFormat(proto, tvb.?, 0, -1, "This is Sharkuana example version {s}, a Wireshark postdissector plugin prototype", .{pluginVersion}) catch {};
+    _ = tree.AddProtocolFormat(proto.id, tvb, 0, -1, "This is Sharkuana example version {s}, a Wireshark postdissector plugin prototype", .{pluginVersion}) catch {};
 
-    return @intCast(shark.tvb_captured_length(tvb.?));
+    return @intCast(tvb.capturedLength());
 }

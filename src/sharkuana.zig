@@ -4,10 +4,6 @@ const c = @cImport({
     @cInclude("epan/packet.h");
 });
 
-pub const tvbuff_t = c.tvbuff_t;
-pub const proto_tree = c.proto_tree;
-pub const tvb_captured_length = c.tvb_captured_length;
-
 export const plugin_version: [root.pluginVersion.len:0]u8 = root.pluginVersion.*;
 export const plugin_want_major: c_int = c.WIRESHARK_VERSION_MAJOR;
 export const plugin_want_minor: c_int = c.WIRESHARK_VERSION_MINOR;
@@ -35,15 +31,30 @@ export fn plugin_register() void {
     proto_register_plugin(&plug);
 }
 
-pub const ProtoTree = *opaque {
-    pub fn AddProtocolFormat(tree: ProtoTree, proto: Proto, tvb: ?*tvbuff_t, start: c_int, length: c_int, comptime format: []const u8, args: anytype) !*c.proto_item {
+pub const TvBuff = opaque{
+    pub fn capturedLength(tvb: *TvBuff) u32 {
+        return tvb_captured_length(tvb);
+    }
+    extern fn tvb_captured_length(tvb: *TvBuff) c_uint;
+};
+
+pub const PacketInfo = extern struct {
+    current_proto: *const u8,
+    cinfo: *c.epan_column_info,
+    presence_flags: u32,
+    num: u32,
+    abs_ts: std.posix.timeval
+};
+
+pub const ProtoTree = opaque {
+    pub fn AddProtocolFormat(tree: *ProtoTree, fieldIndex: i32, tvb: *TvBuff, start: c_int, length: c_int, comptime format: []const u8, args: anytype) !*c.proto_item {
         const alloc = std.heap.page_allocator; // TODO: extract allocator.
         const msg = try std.fmt.allocPrintZ(alloc, format, args);
         defer alloc.free(msg);
 
-        return proto_tree_add_protocol_format(tree, proto, tvb, start, length, msg);
+        return proto_tree_add_protocol_format(tree, fieldIndex, tvb, start, length, msg);
     }
-    extern fn proto_tree_add_protocol_format(tree: ProtoTree, hfindex: Proto, tvb: ?*tvbuff_t, start: c_int, length: c_int, format: [*:0]const u8, ...) *c.proto_item;
+    extern fn proto_tree_add_protocol_format(tree: *ProtoTree, hfindex: i32, tvb: *TvBuff, start: c_int, length: c_int, format: [*:0]const u8, ...) *c.proto_item;
 };
 
 
@@ -53,27 +64,22 @@ const proto_plugin = extern struct {
 };
 extern fn proto_register_plugin(plugin: *const proto_plugin) void;
 
-pub const PacketInfo = extern struct {
-    current_proto: *c_char,
-    cinfo: *c.epan_column_info,
-    presence_flags: c.guint32,
-    num: c.guint32,
-};
+pub const DissectorFn = *const fn (*TvBuff, *PacketInfo, *ProtoTree, ?*anyopaque) callconv(.C) i32;
 
-pub const DissectorFn = ?*const fn (?*tvbuff_t, ?*PacketInfo, ProtoTree, ?*anyopaque) callconv(.C) c_int;
-
-pub const DissectorHandle = *opaque {
-    pub fn registerPostdissector(handle: DissectorHandle) void {
+pub const DissectorHandle = opaque {
+    pub fn registerPostdissector(handle: *DissectorHandle) void {
         register_postdissector(handle);
     }
-    extern fn register_postdissector(handle: DissectorHandle) void;
+    extern fn register_postdissector(handle: *DissectorHandle) void;
 };
 
-pub const Proto = *opaque {
-    pub fn createDissectorHandle(proto: Proto, dissector: DissectorFn) DissectorHandle {
-        return create_dissector_handle(dissector, proto);
+pub const Proto = extern struct {
+    id: i32,
+
+    pub fn createDissectorHandle(proto: *Proto, dissector: DissectorFn) *DissectorHandle {
+        return create_dissector_handle(dissector, proto.id);
     }
-    extern fn create_dissector_handle(dissector: DissectorFn, proto: Proto) DissectorHandle;
+    extern fn create_dissector_handle(dissector: DissectorFn, proto: c_int) *DissectorHandle;
 };
 
 pub fn protoRegisterProtocol(name: [*:0]const u8, short_name: [*:0]const u8, filter_name: [*:0]const u8) Proto {
