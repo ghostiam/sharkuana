@@ -23,8 +23,8 @@ pub const wiresharkPlugin = shark.Plugin{
         .filter_name = "sharkuana_example",
     },
     .dissector = .{
-        .name = "Dissector name", // Can be null
-        .description = "Dissector description", // Can be null
+        .name = "dissector_name",
+        .description = "Dissector description",
         .handler = dissect_zig,
     },
 };

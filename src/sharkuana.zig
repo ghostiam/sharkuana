@@ -27,8 +27,8 @@ pub const PluginProtocol = struct {
 
 pub const PluginDissector = struct {
     // TODO: use create_dissector_handle_with_name_and_description
-    name: ?[:0]const u8,
-    description: ?[:0]const u8,
+    name: ?[*:0]const u8,
+    description: ?[*:0]const u8,
     handler: PluginDissectorFn,
 };
 
@@ -57,7 +57,9 @@ fn proto_register() void {
     const wp: Plugin = root.wiresharkPlugin;
 
     registeredProto = proto_register_protocol(wp.protocol.name, wp.protocol.short_name, wp.protocol.filter_name);
-    var h = registeredProto.createDissectorHandle(wrapped_dissector);
+
+    // var h = create_dissector_handle(wrapped_dissector, registeredProto.id);
+    var h = create_dissector_handle_with_name_and_description(wrapped_dissector, registeredProto.id, wp.dissector.name, wp.dissector.description);
     h.registerPostdissector();
 }
 
@@ -117,8 +119,8 @@ pub const DissectorHandle = opaque {
     pub fn registerPostdissector(handle: *DissectorHandle) void {
         register_postdissector(handle);
     }
-    extern fn register_postdissector(handle: *DissectorHandle) void;
 };
+extern fn register_postdissector(handle: *DissectorHandle) void;
 
 pub const Proto = extern struct {
     id: i32,
@@ -126,8 +128,9 @@ pub const Proto = extern struct {
     pub fn createDissectorHandle(proto: *Proto, dissector: DissectorFn) *DissectorHandle {
         return create_dissector_handle(dissector, proto.id);
     }
-    extern fn create_dissector_handle(dissector: DissectorFn, proto: c_int) *DissectorHandle;
 };
+extern fn create_dissector_handle(dissector: DissectorFn, proto: c_int) *DissectorHandle;
+extern fn create_dissector_handle_with_name_and_description(dissector: DissectorFn, proto: c_int, name: ?[*:0]const u8, description: ?[*:0]const u8) *DissectorHandle;
 
 pub fn protoRegisterProtocol(name: [*:0]const u8, short_name: [*:0]const u8, filter_name: [*:0]const u8) Proto {
     return proto_register_protocol(name, short_name, filter_name);
