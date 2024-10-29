@@ -61,7 +61,18 @@ fn proto_register() void {
     // var h = create_dissector_handle(wrapped_dissector, registeredProto.id);
     var h = create_dissector_handle_with_name_and_description(wrapped_dissector, registeredProto.id, wp.dissector.name, wp.dissector.description);
     h.registerPostdissector();
+
+    const m = prefs_register_protocol(registeredProto, empty);
+    c.prefs_register_static_text_preference(m, "helper", "Test sharkuana prefs", null);
 }
+
+fn empty() callconv(.C) void {
+    wsLogger(.debug, .sharkuana, "empty", .{});
+}
+
+pub const PrefsApplyFn = *const fn () callconv(.C) void;
+
+extern fn prefs_register_protocol(proto: Proto, apply_cb: PrefsApplyFn) *c.module_t;
 
 fn wrapped_dissector(tvb: *TvBuff, pinfo: *PacketInfo, tree: *ProtoTree, _: ?*anyopaque) callconv(.C) i32 {
     wsLogger(.debug, .sharkuana, "wrapped_dissector", .{});
