@@ -4,9 +4,37 @@ const c = @cImport({
     @cInclude("epan/packet.h");
 });
 
-export const plugin_version: [root.pluginVersion.len:0]u8 = root.pluginVersion.*;
+export const plugin_version: [root.wiresharkPlugin.version.len:0]u8 = cast_anytype_ptr([root.wiresharkPlugin.version.len:0]u8, root.wiresharkPlugin.version).*;
 export const plugin_want_major: c_int = c.WIRESHARK_VERSION_MAJOR;
 export const plugin_want_minor: c_int = c.WIRESHARK_VERSION_MINOR;
+
+pub fn cast_anytype_ptr(comptime T: type, ptr: anytype) *T {
+    return @constCast(@ptrCast(@alignCast(ptr)));
+}
+
+pub const Plugin = struct {
+    version: [:0]const u8,
+    plugin_describe: PluginDesc,
+    protocol: PluginProtocol,
+    dissector: PluginDissector,
+};
+
+pub const PluginProtocol = struct {
+    name: [:0]const u8,
+    short_name: [:0]const u8,
+    filter_name: [:0]const u8, // TODO check format in comptime
+};
+
+pub const PluginDissector = struct {
+    // TODO: use create_dissector_handle_with_name_and_description
+    name: ?[:0]const u8,
+    description: ?[:0]const u8,
+    handler: PluginDissectorFn,
+};
+
+pub const DissectorError = error{};
+
+pub const PluginDissectorFn = *const fn (*TvBuff, *PacketInfo, *ProtoTree, Proto) DissectorError!i32;
 
 pub const PluginDesc = enum(u32) {
     Dissector = 1 << 0,
@@ -18,33 +46,53 @@ pub const PluginDesc = enum(u32) {
 };
 
 export fn plugin_describe() u32 {
-    return @intFromEnum(root.plugin_describe());
+    return @intFromEnum(root.wiresharkPlugin.plugin_describe);
 }
+
+pub var registeredProto: Proto = undefined;
+
+fn proto_register() void {
+    wsLogger(.debug, .sharkuana, "proto_register_zig", .{});
+
+    const wp: Plugin = root.wiresharkPlugin;
+
+    registeredProto = proto_register_protocol(wp.protocol.name, wp.protocol.short_name, wp.protocol.filter_name);
+    var h = registeredProto.createDissectorHandle(wrapped_dissector);
+    h.registerPostdissector();
+}
+
+fn wrapped_dissector(tvb: *TvBuff, pinfo: *PacketInfo, tree: *ProtoTree, _: ?*anyopaque) callconv(.C) i32 {
+    wsLogger(.debug, .sharkuana, "wrapped_dissector", .{});
+
+    const wp: Plugin = root.wiresharkPlugin;
+
+    return wp.dissector.handler(tvb, pinfo, tree, registeredProto) catch |err| {
+        wsLogger(.err, .sharkuana, "wrapped_dissector error: {}", .{err});
+    };
+}
+
+////////////
 
 export fn plugin_register() void {
     wsLogger(.debug, .sharkuana, "Register plugin", .{});
 
     const plug = proto_plugin{
-        .register_protoinfo = root.proto_register,
-        .register_handoff = if (@hasDecl(root, "proto_reg_handoff")) root.proto_reg_handoff else null,
+        .register_protoinfo = proto_register,
+        .register_handoff = null,
+        // .register_protoinfo = root.proto_register,
+        // .register_handoff = if (@hasDecl(root, "proto_reg_handoff")) root.proto_reg_handoff else null,
     };
     proto_register_plugin(&plug);
 }
 
-pub const TvBuff = opaque{
+pub const TvBuff = opaque {
     pub fn capturedLength(tvb: *TvBuff) u32 {
         return tvb_captured_length(tvb);
     }
     extern fn tvb_captured_length(tvb: *TvBuff) c_uint;
 };
 
-pub const PacketInfo = extern struct {
-    current_proto: *const u8,
-    cinfo: *c.epan_column_info,
-    presence_flags: u32,
-    num: u32,
-    abs_ts: std.posix.timeval
-};
+pub const PacketInfo = extern struct { current_proto: *const u8, cinfo: *c.epan_column_info, presence_flags: u32, num: u32, abs_ts: std.posix.timeval };
 
 pub const ProtoTree = opaque {
     pub fn AddProtocolFormat(tree: *ProtoTree, fieldIndex: i32, tvb: *TvBuff, start: c_int, length: c_int, comptime format: []const u8, args: anytype) !*c.proto_item {
@@ -56,7 +104,6 @@ pub const ProtoTree = opaque {
     }
     extern fn proto_tree_add_protocol_format(tree: *ProtoTree, hfindex: i32, tvb: *TvBuff, start: c_int, length: c_int, format: [*:0]const u8, ...) *c.proto_item;
 };
-
 
 const proto_plugin = extern struct {
     register_protoinfo: ?*const fn () void,
