@@ -72,6 +72,9 @@
           xmlstarlet
           coreutils
 
+          # c to ast json
+          clang
+
           # For wireshark build
           bash
           git

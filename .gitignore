@@ -1,3 +1,5 @@
 .idea
 .zig-cache
 zig-out
+
+wireshark-ast.json
