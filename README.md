@@ -1,34 +1,36 @@
 # Sharkuana - Wireshark plugin bindings for the ZIG language
 
-A **very early**, hand-crafted API for creating Wireshark plugins in the ZIG language.
+A **very early**, API for creating Wireshark plugins in the ZIG language.
 
-At the moment, only the ability to build for MacOS Arm has been tested,
-but as soon as the main functionality is completed,
-support for other OS will be implemented.
+At the moment, only the ability to build for MacOS and Linux has been tested,
+but as soon as the main functionality is completed, support for Windows will be implemented.
 
-## Required Dependencies
+## Build Wireshark libraries
 
-At this moment, you need to clone Wireshark to the root of the project and build the libraries:
+To build the Wireshark libraries, you need to have `nix` installed.
 
 ```shell
 nix develop --command ./scripts/build-wireshark-libs.bash
 ```
 
 If you don't have `nix`, you can use the fallback script
-which will try using the docker or run script locally.
+which will try using the 
+- `nix`;
+- `docker` with `nix` (This build will only be for Linux);
+- run script locally(You will need to install dependencies manually).
 
 ```shell
 ./nix-fallback.bash ./scripts/build-wireshark-libs.bash
 ```
 
-## Building an example plugin
+[//]: # (TODO: Build in CI and import as zig deps)
 
-Go to the [example](example) directory and run `zig build`
+## Building a minimal plugin
 
 To quickly test the plugin, use the command:
 
 ```shell
-zig build && cp zig-out/lib/libsharkuana-example.dylib ~/.local/lib/wireshark/plugins/4-4/epan/libsharkuana-example.so && /Applications/Wireshark.app/Contents/MacOS/Wireshark --log-domains sharkuana,sharkuana_example --log-level noisy
+zig build && mkdir -p ~/.local/lib/wireshark/plugins/4-4/epan && cp zig-out/lib/libsharkuana.dylib ~/.local/lib/wireshark/plugins/4-4/epan/libsharkuana.so && /Applications/Wireshark.app/Contents/MacOS/Wireshark --log-domains sharkuana --log-level noisy
 ```
 
 ## License
