@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -x
-
 WIRESHARK_BRANCH="release-4.4"
 
 # Strict mode.
@@ -41,12 +39,9 @@ build_libs() {
   fi
   cd wireshark
 
-  if [ -d build ]; then
-      rm -rf build
-  fi
-  mkdir build
-
-  cd build
+  build_dir="build-$(uname)"
+  mkdir -p "$build_dir"
+  cd "$build_dir"
 
   cmake -DENABLE_APPLICATION_BUNDLE=OFF -DBUILD_androiddump=OFF -DBUILD_ciscodump=OFF -DBUILD_mmdbresolve=OFF -DBUILD_randpkt=OFF -DBUILD_randpktdump=OFF -DBUILD_sharkd=OFF -DBUILD_sshdump=OFF -DBUILD_wifidump=OFF -DBUILD_wireshark=OFF -DBUILD_tshark=OFF ..
 

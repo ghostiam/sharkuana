@@ -46,16 +46,16 @@ pub fn addLibsTo(b: *std.Build, compile_step: anytype, target: std.Target) void 
 
     switch (target.os.tag) {
         .macos => {
-            compile_step.addObjectFile(ws_dep.path("build/run/libwireshark.dylib"));
-            compile_step.addObjectFile(ws_dep.path("build/run/libwsutil.dylib"));
+            compile_step.addObjectFile(ws_dep.path("build-Darwin/run/libwireshark.dylib"));
+            compile_step.addObjectFile(ws_dep.path("build-Darwin/run/libwsutil.dylib"));
         },
         .linux, .freebsd => {
-            compile_step.addObjectFile(ws_dep.path("build/run/libwireshark.so"));
-            compile_step.addObjectFile(ws_dep.path("build/run/libwsutil.so"));
+            compile_step.addObjectFile(ws_dep.path("build-Linux/run/libwireshark.so"));
+            compile_step.addObjectFile(ws_dep.path("build-Linux/run/libwsutil.so"));
         },
         .windows => {
-            compile_step.addObjectFile(ws_dep.path("build/run/libwireshark.dll"));
-            compile_step.addObjectFile(ws_dep.path("build/run/libwsutil.dll"));
+            compile_step.addObjectFile(ws_dep.path("build-Windows/run/libwireshark.dll"));
+            compile_step.addObjectFile(ws_dep.path("build-Windows/run/libwsutil.dll"));
         },
         else => @panic("unsupported OS"),
     }
