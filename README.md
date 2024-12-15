@@ -11,10 +11,14 @@ support for other OS will be implemented.
 At this moment, you need to clone Wireshark to the root of the project and build the libraries:
 
 ```shell
-git clone https://gitlab.com/wireshark/wireshark.git
-cd wireshark
-mkdir build && cd build
-cmake -DBUILD_wireshark=OFF ..
+nix develop --command ./scripts/build-wireshark-libs.bash
+```
+
+If you don't have `nix`, you can use the fallback script
+which will try using the docker or run script locally.
+
+```shell
+./nix-fallback.bash ./scripts/build-wireshark-libs.bash
 ```
 
 ## Building an example plugin
