@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+set -x
+
+WIRESHARK_BRANCH="release-4.4"
+
 # Strict mode.
 set -e -u -o pipefail
 
@@ -21,8 +25,19 @@ check_dependencies() {
 }
 
 build_libs() {
+  if [ -d wireshark ]; then
+      cd wireshark
+      branch_exists="$(git branch | grep -q "$WIRESHARK_BRANCH" ; echo $?)"
+      cd ..
+
+      if [ "$branch_exists" -ne 0 ]; then
+          echo "Branch $WIRESHARK_BRANCH does not exist, removing wireshark directory."
+          rm -rf wireshark
+      fi
+  fi
+
   if [ ! -d wireshark ]; then
-      git clone --depth 1 https://gitlab.com/wireshark/wireshark.git
+      git clone --depth 1 -b "$WIRESHARK_BRANCH" https://gitlab.com/wireshark/wireshark.git
   fi
   cd wireshark
 
