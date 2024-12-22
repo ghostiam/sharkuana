@@ -125,7 +125,7 @@ fn parse(ast_data: ast.Item, allocator: mem.Allocator) !void {
 
 const StructData = struct {
     name: []const u8,
-    fields: std.ArrayListUnmanaged(StructFieldData) = .empty,
+    fields: std.ArrayListUnmanaged(StructFieldData) = .empty, // TODO: remove std.ArrayListUnmanaged with toOwnedSlice
     doc_comment: ?[]const u8 = null,
 
     const Self = @This();
@@ -141,7 +141,7 @@ const StructData = struct {
         for (inner) |in| {
             switch (in.kind) {
                 .FieldDecl => {
-                    try data.fields.append(allocator, try StructFieldData.parse(in));
+                    try data.fields.append(allocator, try StructFieldData.parse(allocator, in));
                 },
                 .FullComment => {
                     // TODO https://ziglang.org/documentation/master/#Comments
@@ -158,6 +158,10 @@ const StructData = struct {
     }
 
     pub fn deinit(self: *Self, allocator: mem.Allocator) void {
+        for (self.fields.items) |*field| {
+            field.deinit(allocator);
+        }
+
         self.fields.deinit(allocator);
 
         if (self.doc_comment) |c| {
@@ -183,10 +187,11 @@ const StructFieldData = struct {
     type: []const u8,
     is_pointer: bool,
     is_const: bool,
+    doc_comment: ?[]const u8 = null,
 
     const Self = @This();
 
-    pub fn parse(item: ast.Item) !Self {
+    pub fn parse(allocator: mem.Allocator, item: ast.Item) !Self {
         const qual_type = item.qualType() orelse unreachable;
         var raw_type: []const u8 = qual_type;
         const is_pointer = qual_type[qual_type.len - 1] == '*';
@@ -201,13 +206,36 @@ const StructFieldData = struct {
 
         raw_type = mem.trim(u8, raw_type, " ");
 
-        return .{
+        var data = Self{
             .raw = qual_type,
             .name = item.name,
             .type = raw_type,
             .is_pointer = is_pointer,
             .is_const = is_const,
         };
+
+        const inner = item.inner orelse return data;
+
+        for (inner) |in| {
+            switch (in.kind) {
+                .FullComment => {
+                    // TODO https://ziglang.org/documentation/master/#Comments
+                    data.doc_comment = try parse_full_comment(allocator, in);
+                },
+                else => {
+                    log.warn("Unknown item: {}", .{in.kind});
+                    continue;
+                },
+            }
+        }
+
+        return data;
+    }
+
+    pub fn deinit(self: *Self, allocator: mem.Allocator) void {
+        if (self.doc_comment) |c| {
+            allocator.free(c);
+        }
     }
 
     pub fn format(
@@ -230,6 +258,9 @@ const StructFieldData = struct {
         const prefix = w.buffer[0..w.pos];
 
         try std.fmt.format(out_stream, "{?s}: {s}{s}", .{ self.name, prefix, self.type });
+        if (self.doc_comment) |c| {
+            try std.fmt.format(out_stream, " // {s}", .{ c });
+        }
     }
 };
 
@@ -242,7 +273,7 @@ const FunctionData = struct {
     is_variadic: bool = false,
     is_deprecated: bool = false,
     visability: []const u8,
-    params: std.ArrayListUnmanaged(FunctionParamData) = .empty,
+    params: std.ArrayListUnmanaged(FunctionParamData) = .empty, // TODO: remove std.ArrayListUnmanaged with toOwnedSlice
     doc_comment: ?[]const u8 = null,
     format_attr: ?FunctionFormatData = null,
 
@@ -368,6 +399,11 @@ fn parse_full_comment(allocator: mem.Allocator, item: ast.Item) ![]const u8 {
 
     for (inner) |v| {
         try parse_comment(&buf, v);
+    }
+
+    // Remove last '\n'
+    if (buf.getLast() == '\n') {
+        buf.shrinkAndFree(buf.items.len-1);
     }
 
     return buf.toOwnedSlice();
